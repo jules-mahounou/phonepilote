@@ -38,8 +38,8 @@ android {
         buildConfigField("String", "FB_API_KEY", str(cfg("FIREBASE_API_KEY", "firebase.apiKey")))
         buildConfigField("String", "FB_SENDER_ID", str(cfg("FIREBASE_SENDER_ID", "firebase.senderId")))
         // Domaine technique des comptes « numéro de téléphone + mot de passe ».
-        buildConfigField("String", "ACCOUNT_DOMAIN", str(cfg("PP_ACCOUNT_DOMAIN", "pp.accountDomain", "phonepilote.vocta.site")))
-        buildConfigField("String", "SITE_URL", str(cfg("PP_SITE_URL", "pp.siteUrl", "https://phonepilote.vocta.site")))
+        buildConfigField("String", "ACCOUNT_DOMAIN", str(cfg("PP_ACCOUNT_DOMAIN", "pp.accountDomain", "phonepilote.xydhub.tech")))
+        buildConfigField("String", "SITE_URL", str(cfg("PP_SITE_URL", "pp.siteUrl", "https://phonepilote.xydhub.tech")))
     }
 
     androidResources {

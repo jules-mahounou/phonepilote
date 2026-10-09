@@ -1,4 +1,4 @@
-name: Site (phonepilote.vocta.site)
+name: Site (phonepilote.xydhub.tech)
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ jobs:
       FTP_USER: ${{ secrets.FTP_USER }}
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       FTP_DIR: ${{ vars.FTP_DIR }}
-      SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.vocta.site' }}
+      SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.xydhub.tech' }}
     steps:
       - uses: actions/checkout@v4
 

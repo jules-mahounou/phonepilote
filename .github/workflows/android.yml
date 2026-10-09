@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: "Publier (FTP phonepilote.vocta.site + app_versions Supabase + Release GitHub)"
+        description: "Publier (FTP phonepilote.xydhub.tech + app_versions Supabase + Release GitHub)"
         type: boolean
         default: false
       force:
@@ -30,7 +30,7 @@ permissions:
 
 env:
   MAX_APK_BYTES: "15728640" # 15 Mo : le build échoue au-delà.
-  SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.vocta.site' }}
+  SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.xydhub.tech' }}
 
 jobs:
   build:
@@ -43,7 +43,7 @@ jobs:
       FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
       FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY || secrets.FIREBASE_API_KEY }}
       FIREBASE_SENDER_ID: ${{ vars.FIREBASE_SENDER_ID }}
-      PP_SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.vocta.site' }}
+      PP_SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.xydhub.tech' }}
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       PP_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       PP_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -154,7 +154,7 @@ jobs:
         if: env.PUBLISH == 'true'
         env:
           SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          APK_URL: ${{ vars.APK_URL || format('{0}/phonepilote.apk', vars.SITE_URL || 'https://phonepilote.vocta.site') }}
+          APK_URL: ${{ vars.APK_URL || format('{0}/phonepilote.apk', vars.SITE_URL || 'https://phonepilote.xydhub.tech') }}
           FORCE: ${{ inputs.force == true && 'true' || 'false' }}
           CHANGELOG: ${{ inputs.changelog }}
         run: |

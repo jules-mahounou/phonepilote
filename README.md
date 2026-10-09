@@ -1,7 +1,7 @@
 # PhonePilote
 
 Service anti-vol et de récupération de téléphones (Bénin). Application Android **Device Admin** (Kotlin + Jetpack Compose),
-plateforme **Supabase**, commandes à distance par **Firebase Cloud Messaging**, site de téléchargement sur `phonepilote.vocta.site`.
+plateforme **Supabase**, commandes à distance par **Firebase Cloud Messaging**, site de téléchargement sur `phonepilote.xydhub.tech`.
 
 Tout se construit et se déploie par GitHub Actions : aucun build local nécessaire.
 
