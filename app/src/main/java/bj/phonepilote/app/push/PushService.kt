@@ -18,12 +18,9 @@ class PushService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        when (message.data["cmd"]) {
-            "ping" -> Repo.sync()
-            "lock" -> {
-                Protection.lockNow(this)
-                Repo.sync()
-            }
-        }
+        // Verrouillage immédiat pour la réactivité ; le reste (statut, localisation) passe par le
+        // même exécuteur que le repli sans push, ce qui met aussi à jour la commande côté serveur.
+        if (message.data["cmd"] == "lock") Protection.lockNow(this)
+        Repo.pollCommands()
     }
 }

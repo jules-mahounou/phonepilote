@@ -218,6 +218,45 @@ function renderStats() {
 
 // ---------------------------------------------------------------- Tableaux
 
+// Actions à distance (mode test uniquement). Le vrai contrôle d'accès est côté base :
+// admin_send_command refuse si le téléphone n'est pas en test_mode, et n'est exécutable que par un admin.
+function deviceActions(x) {
+  const box = el("span", { class: "rowact" });
+  const toggle = el("button", { class: "ghost", type: "button", "data-act": "test", "data-id": x.id,
+    text: x.test_mode ? "Test : ON" : "Test : OFF", title: "Autoriser les actions à distance sur ce téléphone" });
+  if (x.test_mode) toggle.classList.add("on");
+  box.append(toggle);
+  if (x.test_mode) {
+    box.append(
+      el("button", { class: "ghost", type: "button", "data-act": "locate", "data-id": x.id, text: "Localiser" }),
+      el("button", { class: "ghost", type: "button", "data-act": "lock", "data-id": x.id, text: "Verrouiller" }),
+    );
+  }
+  return box;
+}
+
+async function deviceAction(btn) {
+  const id = btn.dataset.id;
+  const act = btn.dataset.act;
+  const dev = data.devices.find((d) => d.id === id);
+  if (act === "lock" && !confirm("Verrouiller ce téléphone de test maintenant ?")) return;
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = "…";
+  try {
+    if (act === "test") {
+      await api("/rest/v1/rpc/admin_set_test_mode", { method: "POST", body: { device: id, enabled: !dev.test_mode } });
+    } else {
+      await api("/rest/v1/rpc/admin_send_command", { method: "POST", body: { device: id, action: act } });
+    }
+    await load();
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = old;
+    $("appErr").textContent = e.message;
+  }
+}
+
 const owners = () => new Map(data.users.map((u) => [u.id, u]));
 const devName = (id, devs) => { const x = devs.get(id); return x ? `${x.manufacturer} ${x.model}`.trim() || id.slice(0, 8) : id.slice(0, 8); };
 const ownerLabel = (id, users) => { const u = users.get(id); return u ? (u.name ? `${u.name} · ${prettyPhone(u.phone)}` : prettyPhone(u.phone)) : id.slice(0, 8); };
@@ -241,7 +280,7 @@ function views() {
         ownerLabel(x.owner_id, users), x.imei ? el("code", { text: x.imei }) : "—", `SDK ${x.android_sdk}`, x.app_version,
         pill(x.admin_active), pill(x.location_ok), pill(x.battery_ok),
         x.emergency_phone ? prettyPhone(x.emergency_phone) : "—", ago(x.last_seen),
-        el("button", { class: "ghost", type: "button", disabled: "", title: "Disponible après obtention des agréments", text: "Bientôt" }),
+        deviceActions(x),
       ],
       text: (x) => `${x.manufacturer} ${x.model} ${x.imei || ""} ${x.owner_name || ""} ${x.emergency_phone || ""} ${x.id} ${ownerLabel(x.owner_id, users)}`,
     },
@@ -295,6 +334,10 @@ function init() {
   $("logout").addEventListener("click", () => logout(true));
   $("refresh").addEventListener("click", load);
   $("search").addEventListener("input", render);
+  $("table").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-act]");
+    if (b && !b.disabled) deviceAction(b);
+  });
   $("tabs").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-tab]");
     if (!b) return;

@@ -163,6 +163,57 @@ object Repo {
             .put("last_seen", Instant.now().toString())
     }
 
+    // ---------- Commandes à distance (verrouiller / localiser) ----------
+
+    private val handledCommands = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    private val commandLock = Mutex()
+
+    /**
+     * Récupère les commandes en attente et les exécute. Appelée à la réception d'un push
+     * et, tant que l'app est au premier plan, toutes les quelques secondes (repli sans push).
+     */
+    fun pollCommands() {
+        if (!Supabase.configured || _session.value == null) return
+        scope.launch {
+            commandLock.withLock {
+                val pending = runCatching { Supabase.pendingCommands(deviceId) }.getOrNull() ?: return@withLock
+                for (i in 0 until pending.length()) {
+                    val c = pending.getJSONObject(i)
+                    val id = c.getString("id")
+                    if (!handledCommands.add(id)) continue
+                    runCatching { execute(id, c.getString("kind")) }
+                }
+            }
+        }
+    }
+
+    private suspend fun execute(id: String, kind: String) {
+        var status = "done"
+        var result: JSONObject? = null
+        when (kind) {
+            "ping" -> result = JSONObject().put("ok", true)
+            "lock" -> {
+                val ok = Protection.lockNow(ctx)
+                status = if (ok) "done" else "failed"
+                result = JSONObject().put("locked", ok)
+            }
+            "locate" -> {
+                val loc = bj.phonepilote.app.admin.Locator.current(ctx)
+                if (loc != null) {
+                    runCatching { Supabase.insertLocation(deviceId, loc.latitude, loc.longitude, loc.accuracy.takeIf { loc.hasAccuracy() }) }
+                    result = JSONObject().put("lat", loc.latitude).put("lng", loc.longitude)
+                } else {
+                    status = "failed"
+                    result = JSONObject().put("error", "Position indisponible (localisation désactivée ?)")
+                }
+            }
+            "unlock" -> result = JSONObject().put("note", "unlock non applicable en v1")
+            else -> { status = "failed"; result = JSONObject().put("error", "Commande inconnue") }
+        }
+        runCatching { Supabase.finishCommand(id, status, result) }
+        sync()
+    }
+
     fun signOut() {
         val s = _session.value ?: return
         saveSession(null)

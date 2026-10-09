@@ -121,6 +121,30 @@ object Supabase {
         )
     }
 
+    /** Commandes en attente pour ce téléphone (pending/sent), les plus anciennes d'abord. */
+    suspend fun pendingCommands(deviceId: String): JSONArray {
+        val q = "/rest/v1/commands?select=id,kind,status" +
+            "&device_id=eq.$deviceId&status=in.(pending,sent)&order=created_at.asc"
+        return JSONArray(authedOk(q))
+    }
+
+    /** Marque une commande terminée (ou échouée) avec son résultat. */
+    suspend fun finishCommand(id: String, status: String, result: JSONObject?) {
+        val body = JSONObject()
+            .put("status", status)
+            .put("result", result ?: JSONObject.NULL)
+            .put("done_at", java.time.Instant.now().toString())
+        authedOk("/rest/v1/commands?id=eq.$id", "PATCH", body.toString(), mapOf("Prefer" to "return=minimal"))
+    }
+
+    /** Remonte une position relevée par ce téléphone. */
+    suspend fun insertLocation(deviceId: String, lat: Double, lng: Double, accuracyM: Float?) {
+        val body = JSONObject()
+            .put("device_id", deviceId).put("lat", lat).put("lng", lng)
+            .put("accuracy_m", accuracyM?.toDouble() ?: JSONObject.NULL)
+        authedOk("/rest/v1/locations", "POST", JSONArray().put(body).toString(), mapOf("Prefer" to "return=minimal"))
+    }
+
     suspend fun latestVersion(): AppVersion? {
         val arr = JSONArray(public("/rest/v1/app_versions?select=*&order=version_code.desc&limit=1"))
         if (arr.length() == 0) return null
