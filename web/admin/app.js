@@ -15,7 +15,7 @@ const STORE = "pp_admin_session";  // sessionStorage : effacé à la fermeture d
 const $ = (id) => document.getElementById(id);
 let session = null;
 let data = { users: [], devices: [], commands: [], locations: [], versions: [] };
-let tab = "users";
+let tab = "devices";
 let idleTimer = null;
 
 // ---------------------------------------------------------------- Utilitaires
