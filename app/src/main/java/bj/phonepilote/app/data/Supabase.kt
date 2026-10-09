@@ -121,6 +121,12 @@ object Supabase {
         )
     }
 
+    /** Mode test de ce téléphone (posé par un admin) : autorise les commandes SMS avant les agréments. */
+    suspend fun testMode(deviceId: String): Boolean {
+        val arr = JSONArray(authedOk("/rest/v1/devices?select=test_mode&id=eq.$deviceId"))
+        return arr.length() > 0 && arr.getJSONObject(0).optBoolean("test_mode", false)
+    }
+
     /** Commandes en attente pour ce téléphone (pending/sent), les plus anciennes d'abord. */
     suspend fun pendingCommands(deviceId: String): JSONArray {
         val q = "/rest/v1/commands?select=id,kind,status" +
@@ -138,7 +144,7 @@ object Supabase {
     }
 
     /** Remonte une position relevée par ce téléphone. */
-    /** [source] : « command » (demandée depuis /admin) ou « periodic » (historique automatique). */
+    /** [source] : « command » (/admin), « periodic » (historique automatique) ou « sms ». */
     suspend fun insertLocation(deviceId: String, lat: Double, lng: Double, accuracyM: Float?, source: String) {
         val body = JSONObject()
             .put("device_id", deviceId).put("lat", lat).put("lng", lng)

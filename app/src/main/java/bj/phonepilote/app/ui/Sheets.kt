@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
 import bj.phonepilote.app.BuildConfig
 import bj.phonepilote.app.admin.Protection
+import bj.phonepilote.app.admin.SmsCommands
 import bj.phonepilote.app.data.Http
 import bj.phonepilote.app.data.Owner
 import bj.phonepilote.app.data.Phone
@@ -416,9 +417,97 @@ fun SettingsSheet(onDismiss: () -> Unit) {
                 }
             }
             if (session != null) {
+                Spacer(Modifier.height(12.dp))
+                SmsSection(session!!.phone)
                 Spacer(Modifier.height(20.dp))
                 GhostButton("Se déconnecter", { Repo.signOut(); onDismiss() }, color = PP.Danger)
             }
+        }
+    }
+}
+
+/** Commandes par SMS : choix du code secret, permissions, mode d'emploi. */
+@Composable
+private fun SmsSection(ownerPhone: String) {
+    val ctx = LocalContext.current
+    val life by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    var version by remember { mutableIntStateOf(0) } // force le recalcul après une modification
+    val codeSet = remember(life, version) { SmsCommands.isCodeSet(ctx) }
+    val perms = remember(life, version) { SmsCommands.hasPermissions(ctx) }
+    val allowed = remember(life, version) { SmsCommands.remoteAllowed(ctx) }
+    var editing by rememberSaveable { mutableStateOf(false) }
+    var code by rememberSaveable { mutableStateOf("") }
+    var confirm by rememberSaveable { mutableStateOf("") }
+    var err by remember { mutableStateOf<String?>(null) }
+    val askPerms = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        version++
+        Repo.sync()
+    }
+
+    fun save() {
+        err = SmsCommands.validate(code) ?: if (code != confirm) "Les deux codes ne correspondent pas" else null
+        if (err != null) return
+        SmsCommands.setCode(ctx, code)
+        code = ""; confirm = ""; editing = false; version++
+        if (!SmsCommands.hasPermissions(ctx)) askPerms.launch(SmsCommands.permissions) else Repo.sync()
+    }
+
+    GlassCard(Modifier.fillMaxWidth(), strong = true) {
+        Text("Commandes par SMS (sans internet)", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            when {
+                !codeSet -> "Non configuré"
+                !perms -> "Permissions SMS manquantes"
+                else -> "Actif"
+            },
+            fontSize = 13.sp, color = if (codeSet && perms) PP.Success else PP.Muted, fontWeight = FontWeight.SemiBold,
+        )
+        if (!allowed) {
+            Spacer(Modifier.height(10.dp))
+            Notice("En attendant les agréments, les commandes SMS ne fonctionnent que sur les téléphones de test.", PP.BlueDeep, PP.BlueSoft)
+        }
+        if (codeSet && !editing) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Depuis n'importe quel téléphone, envoyez au ${Phone.pretty(ownerPhone)} :\n" +
+                    "• PP LOCK <code> : verrouille\n• PP LOCATE <code> : répond avec la position\n\n" +
+                    "Envoyez toujours LOCK en premier : le SMS reste visible dans la messagerie tant que l'écran n'est pas verrouillé. " +
+                    "Après avoir récupéré le téléphone, changez de code.",
+                fontSize = 13.sp, color = PP.Muted, lineHeight = 18.sp,
+            )
+            Spacer(Modifier.height(12.dp))
+            if (!perms) {
+                AccentButton("Autoriser les SMS", { askPerms.launch(SmsCommands.permissions) })
+                Spacer(Modifier.height(8.dp))
+            }
+            GhostButton("Changer le code", { editing = true })
+            GhostButton("Désactiver", { SmsCommands.clearCode(ctx); version++; Repo.sync() }, color = PP.Danger)
+        } else {
+            if (!codeSet && !editing) {
+                Spacer(Modifier.height(12.dp))
+                AccentButton("Choisir un code secret", { editing = true })
+            }
+        }
+        if (editing) {
+            Spacer(Modifier.height(12.dp))
+            PField(
+                code, { v -> code = v.filter { it.isDigit() }.take(6) }, "Code secret (6 chiffres)", password = true,
+                keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                supporting = "Ne le donnez à personne. Évitez votre date de naissance.",
+            )
+            Spacer(Modifier.height(8.dp))
+            PField(
+                confirm, { v -> confirm = v.filter { it.isDigit() }.take(6) }, "Confirmer le code", password = true,
+                keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            )
+            if (err != null) {
+                Spacer(Modifier.height(8.dp))
+                Notice(err!!, PP.Danger, PP.DangerSoft)
+            }
+            Spacer(Modifier.height(12.dp))
+            AccentButton("Enregistrer", ::save)
+            GhostButton("Annuler", { editing = false; code = ""; confirm = ""; err = null })
         }
     }
 }

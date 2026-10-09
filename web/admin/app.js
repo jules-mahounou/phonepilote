@@ -275,6 +275,15 @@ function locationState(x) {
   return pill(true, "Oui");
 }
 
+function smsState(x) {
+  if (x.sms_blocked_until && new Date(x.sms_blocked_until) > new Date()) {
+    return el("span", { class: "pill bad", text: "Bloqué (codes faux)", title: "Trop de mauvais codes : bloqué jusqu'au " + fmtDate(x.sms_blocked_until) });
+  }
+  const p = pill(!!x.sms_enabled, "Actif", "Non");
+  if (!x.sms_last_command) return p;
+  return el("span", {}, p, el("br"), el("span", { class: "muted", text: `${x.sms_last_command.toUpperCase()} ${ago(x.sms_last_at)}` }));
+}
+
 function lastPosition(l) {
   if (!l) return "—";
   return el("a", { href: `https://www.google.com/maps?q=${encodeURIComponent(l.lat + "," + l.lng)}`, target: "_blank", rel: "noopener noreferrer", text: ago(l.created_at) });
@@ -300,11 +309,11 @@ function views() {
     },
     devices: {
       rows: data.devices,
-      cols: ["Appareil", "Propriétaire", "IMEI", "Android", "App", "Admin", "Code écran", "Localisation", "Dernière position", "Batterie", "Secours", "Vu", "Actions"],
+      cols: ["Appareil", "Propriétaire", "IMEI", "Android", "App", "Admin", "Code écran", "Localisation", "Dernière position", "SMS", "Batterie", "Secours", "Vu", "Actions"],
       row: (x) => [
         el("span", {}, el("b", { text: `${x.manufacturer} ${x.model}`.trim() || "—" }), el("br"), el("code", { class: "muted", text: x.id })),
         ownerLabel(x.owner_id, users), x.imei ? el("code", { text: x.imei }) : "—", `SDK ${x.android_sdk}`, x.app_version,
-        pill(x.admin_active), screenLockPill(x.screen_lock_ok), locationState(x), lastPosition(lastPos.get(x.id)), pill(x.battery_ok),
+        pill(x.admin_active), screenLockPill(x.screen_lock_ok), locationState(x), lastPosition(lastPos.get(x.id)), smsState(x), pill(x.battery_ok),
         x.emergency_phone ? prettyPhone(x.emergency_phone) : "—", ago(x.last_seen),
         deviceActions(x),
       ],
@@ -321,7 +330,7 @@ function views() {
     locations: {
       rows: data.locations,
       cols: ["Date", "Appareil", "Origine", "Position", "Précision", "Carte"],
-      row: (l) => [fmtDate(l.created_at), devName(l.device_id, devs), l.source === "periodic" ? "Automatique" : "Demandée",
+      row: (l) => [fmtDate(l.created_at), devName(l.device_id, devs), ({ periodic: "Automatique", sms: "Par SMS" })[l.source] || "Demandée",
         `${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}`,
         l.accuracy_m != null ? `± ${Math.round(l.accuracy_m)} m` : "—",
         el("a", { href: `https://www.google.com/maps?q=${encodeURIComponent(l.lat + "," + l.lng)}`, target: "_blank", rel: "noopener noreferrer", text: "Ouvrir" })],

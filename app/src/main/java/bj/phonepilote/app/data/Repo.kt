@@ -6,6 +6,7 @@ import android.os.Build
 import bj.phonepilote.app.BuildConfig
 import bj.phonepilote.app.admin.Locator
 import bj.phonepilote.app.admin.Protection
+import bj.phonepilote.app.admin.SmsCommands
 import bj.phonepilote.app.push.Push
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -140,6 +141,7 @@ object Repo {
             try {
                 if (fcmToken == null) fcmToken = Push.token()
                 Supabase.upsertDevice(deviceJson())
+                runCatching { SmsCommands.setRemoteAllowed(ctx, Supabase.testMode(deviceId)) }
                 val now = System.currentTimeMillis()
                 prefs.edit().putLong("last_sync", now).apply()
                 lastSync.value = now
@@ -182,6 +184,10 @@ object Repo {
             .put("battery_ok", Protection.ignoresBattery(ctx))
             .put("screen_lock_ok", Protection.hasScreenLock(ctx))
             .put("location_enabled", Protection.isLocationOn(ctx))
+            .put("sms_enabled", SmsCommands.enabled(ctx))
+            .put("sms_blocked_until", SmsCommands.blockedUntil(ctx).takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).toString() } ?: JSONObject.NULL)
+            .put("sms_last_command", SmsCommands.lastCommand(ctx)?.first ?: JSONObject.NULL)
+            .put("sms_last_at", SmsCommands.lastCommand(ctx)?.second?.let { Instant.ofEpochMilli(it).toString() } ?: JSONObject.NULL)
             .put("owner_name", o?.name ?: JSONObject.NULL)
             .put("emergency_phone", o?.emergencyPhone ?: JSONObject.NULL)
             .put("imei", o?.imei?.ifBlank { null } ?: JSONObject.NULL)
@@ -254,6 +260,15 @@ object Repo {
         }
         runCatching { Supabase.finishCommand(id, status, result) }
         sync()
+    }
+
+    /** Position obtenue par « PP LOCATE » : ajoutée à l'historique si internet est disponible. */
+    suspend fun reportSmsLocation(loc: android.location.Location) {
+        if (!Supabase.configured || _session.value == null) return
+        runCatching {
+            Supabase.insertLocation(deviceId, loc.latitude, loc.longitude, loc.accuracy.takeIf { loc.hasAccuracy() }, "sms")
+        }
+        syncNow()
     }
 
     fun signOut() {
