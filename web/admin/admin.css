@@ -58,3 +58,4 @@ a{color:var(--blue)}
 .rowact .ghost{height:30px;padding:0 10px;font-size:12px}
 .rowact .ghost.on{background:var(--ok);border-color:var(--ok);color:#fff}
 .rowact .ghost[data-act=lock]{border-color:var(--bad);color:var(--bad)}
+td .sms-event{display:inline-block;white-space:normal;max-width:240px;font-size:12px}

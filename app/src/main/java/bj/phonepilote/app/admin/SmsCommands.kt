@@ -121,12 +121,13 @@ object SmsCommands {
         return false
     }
 
-    // ---------------------------------------------------------------- Dernière commande (affichée sur /admin)
+    // ---------------------------------------------------------------- Journal (affiché sur /admin)
 
-    fun recordCommand(ctx: Context, kind: Kind) = prefs(ctx).edit()
-        .putString("last_cmd", kind.name.lowercase()).putLong("last_at", System.currentTimeMillis()).apply()
+    /** Dernier événement SMS (« LOCATE répondu », « refusé : code faux »…) : sert au diagnostic sur /admin. */
+    fun recordEvent(ctx: Context, event: String) = prefs(ctx).edit()
+        .putString("last_cmd", event).putLong("last_at", System.currentTimeMillis()).apply()
 
-    fun lastCommand(ctx: Context): Pair<String, Long>? {
+    fun lastEvent(ctx: Context): Pair<String, Long>? {
         val p = prefs(ctx)
         val cmd = p.getString("last_cmd", null) ?: return null
         return cmd to p.getLong("last_at", 0L)
@@ -134,13 +135,27 @@ object SmsCommands {
 
     // ---------------------------------------------------------------- Réponse
 
-    /** Réponse en ASCII : un SMS accentué est limité à 70 caractères au lieu de 160. */
-    fun reply(ctx: Context, to: String, text: String) {
-        if (!granted(ctx, Manifest.permission.SEND_SMS)) return
-        runCatching {
-            val sms = if (Build.VERSION.SDK_INT >= 31) ctx.getSystemService(SmsManager::class.java)
-            else @Suppress("DEPRECATION") SmsManager.getDefault()
+    /** Identifiant de la SIM qui a reçu le SMS (double SIM), ou -1. */
+    fun subscriptionOf(intent: android.content.Intent): Int =
+        intent.getIntExtra("android.telephony.extra.SUBSCRIPTION_INDEX", intent.getIntExtra("subscription", -1))
+
+    /**
+     * Répond par la SIM qui a reçu la commande : avec deux SIM et « demander à chaque fois »,
+     * la SIM par défaut n'existe pas et Android refuse l'envoi sans erreur visible.
+     * Texte en ASCII : un SMS accentué est limité à 70 caractères au lieu de 160.
+     * Retourne null si l'envoi est parti, sinon la raison de l'échec.
+     */
+    fun reply(ctx: Context, to: String, text: String, subId: Int): String? {
+        if (!granted(ctx, Manifest.permission.SEND_SMS)) return "permission d'envoi refusée"
+        return runCatching {
+            val sms: SmsManager = if (Build.VERSION.SDK_INT >= 31) {
+                val base = ctx.getSystemService(SmsManager::class.java)
+                if (subId >= 0) base.createForSubscriptionId(subId) else base
+            } else {
+                @Suppress("DEPRECATION")
+                if (subId >= 0) SmsManager.getSmsManagerForSubscriptionId(subId) else SmsManager.getDefault()
+            }
             sms.sendMultipartTextMessage(to, null, sms.divideMessage(text), null, null)
-        }
+        }.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName }
     }
 }

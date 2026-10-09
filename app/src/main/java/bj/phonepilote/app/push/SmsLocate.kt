@@ -22,6 +22,7 @@ import java.util.Locale
 class SmsLocate(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         val to = inputData.getString(KEY_TO) ?: return Result.success()
+        val subId = inputData.getInt(KEY_SUB, -1)
         val fix = Locator.current(applicationContext, budgetMs = 30_000)
         val loc = fix.location
         val text = if (loc != null) {
@@ -32,9 +33,14 @@ class SmsLocate(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, p
         } else {
             "PhonePilote: position indisponible. " + ascii(fix.error ?: "")
         }
-        SmsCommands.reply(applicationContext, to, text)
-        // Si internet est disponible, la position rejoint aussi l'historique sur la plateforme.
-        if (loc != null) Repo.reportSmsLocation(loc)
+        val err = SmsCommands.reply(applicationContext, to, text, subId)
+        SmsCommands.recordEvent(
+            applicationContext,
+            (if (loc != null) "LOCATE : position trouvée" else "LOCATE : ${fix.error}") +
+                (err?.let { ", réponse SMS échouée ($it)" } ?: ", réponse envoyée"),
+        )
+        // Si internet est disponible : la position rejoint l'historique et la trace remonte sur /admin.
+        if (loc != null) Repo.reportSmsLocation(loc) else Repo.syncNow()
         return Result.success()
     }
 
@@ -55,16 +61,17 @@ class SmsLocate(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, p
 
     companion object {
         private const val KEY_TO = "to"
+        private const val KEY_SUB = "sub"
         private const val CHANNEL = "commands"
         private const val NOTIF_ID = 42
 
         private fun ascii(s: String) = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
             .replace(Regex("\\p{M}"), "").replace(Regex("[^\\x20-\\x7E]"), "")
 
-        fun enqueue(ctx: Context, to: String) {
+        fun enqueue(ctx: Context, to: String, subId: Int) {
             val req = OneTimeWorkRequestBuilder<SmsLocate>()
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .setInputData(workDataOf(KEY_TO to to))
+                .setInputData(workDataOf(KEY_TO to to, KEY_SUB to subId))
                 .build()
             runCatching { WorkManager.getInstance(ctx).enqueue(req) }
         }

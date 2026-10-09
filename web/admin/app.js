@@ -281,7 +281,8 @@ function smsState(x) {
   }
   const p = pill(!!x.sms_enabled, "Actif", "Non");
   if (!x.sms_last_command) return p;
-  return el("span", {}, p, el("br"), el("span", { class: "muted", text: `${x.sms_last_command.toUpperCase()} ${ago(x.sms_last_at)}` }));
+  // Dernier événement SMS remonté par le téléphone (diagnostic) : « LOCATE : position trouvée… », « refusé : code faux »…
+  return el("span", {}, p, el("br"), el("span", { class: "muted sms-event", text: `${x.sms_last_command} · ${ago(x.sms_last_at)}` }));
 }
 
 function lastPosition(l) {
