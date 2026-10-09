@@ -2,6 +2,7 @@ package bj.phonepilote.app
 
 import android.app.Application
 import bj.phonepilote.app.data.Repo
+import bj.phonepilote.app.push.Heartbeat
 import bj.phonepilote.app.push.Push
 
 class PhonePiloteApp : Application() {
@@ -9,5 +10,6 @@ class PhonePiloteApp : Application() {
         super.onCreate()
         Push.init(this)
         Repo.init(this)
+        Heartbeat.schedule(this)
     }
 }

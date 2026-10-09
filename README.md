@@ -11,7 +11,7 @@ Tout se construit et se déploie par GitHub Actions : aucun build local nécessa
 |---|---|
 | `app/` | Application Android (un écran + bottom sheets, design glassmorphisme + flat) |
 | `supabase/migrations/` | Schéma SQL + RLS (rejoué à chaque déploiement, idempotent) |
-| `web/` | Site de téléchargement (index.html, logo, .htaccess) |
+| `web/` | Site de téléchargement (index.html, logo, .htaccess) + espace admin `web/admin/` |
 | `.github/workflows/` | Build APK, publication FTP, backend, site, anti-pause Supabase |
 
 ## Workflows
@@ -26,9 +26,9 @@ Tout se construit et se déploie par GitHub Actions : aucun build local nécessa
 ## Configuration (Settings → Secrets and variables → Actions)
 
 **Variables** : `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_PROJECT_REF`, `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID`,
-`FIREBASE_API_KEY`, `FIREBASE_SENDER_ID`, `FTP_DIR`, `SITE_URL` (facultatif).
+`FIREBASE_API_KEY`, `FIREBASE_SENDER_ID`, `FTP_DIR`, `SITE_URL` (facultatif), `ADMIN_PHONES` (numéros admin, séparés par des virgules).
 
-**Secrets** : `SUPABASE_ACCESS_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `FTP_HOST`, `FTP_USER`, `FTP_PASSWORD`,
+**Secrets** : `SUPABASE_ACCESS_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `FCM_SERVICE_ACCOUNT` (clé de compte de service Firebase, JSON complet), `FTP_HOST`, `FTP_USER`, `FTP_PASSWORD`,
 `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
 
 Sans configuration, l'APK se construit quand même (signature debug, mode démo).
@@ -38,3 +38,15 @@ Sans configuration, l'APK se construit quand même (signature debug, mode démo)
 - **IMEI** : Android 10+ interdit aux apps de lire l'IMEI. Il est saisi par l'utilisateur (`*#06#`), avec contrôle de la clé de Luhn.
 - **Verre** : dessiné sans bibliothèque (halos en dégradés radiaux + cartes translucides), rendu identique d'Android 8 à 15.
 - **Tecno / Infinix / Itel** : l'app guide vers l'écran constructeur de démarrage automatique et la désactivation de l'optimisation batterie.
+
+## Espace admin (`/admin`)
+
+`https://phonepilote.xydhub.tech/admin/` : consultation de la base (comptes, téléphones, commandes, positions, versions), lecture seule en mode démo.
+
+- Connexion avec un compte PhonePilote (numéro + mot de passe, créé dans l'app) listé dans la variable `ADMIN_PHONES`,
+  puis lancer le workflow **Backend (Supabase)** à la main pour appliquer la liste.
+- La sécurité est côté base : RLS + `public.is_admin()`. Un compte non admin ne reçoit aucune donnée des autres.
+- Page non indexée, sans cache, CSP stricte, session limitée à l'onglet, déconnexion après 30 min d'inactivité.
+- **Actions à distance (avant agréments)** : uniquement sur les téléphones passés en « Test » depuis /admin.
+  Localiser / Verrouiller appellent l'Edge Function `command` (déployée par **Backend**), qui vérifie les droits
+  dans la base puis envoie le push FCM. Sans push, le téléphone exécute la commande à l'ouverture de l'app.

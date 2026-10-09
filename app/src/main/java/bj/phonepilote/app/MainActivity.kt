@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 /** Une seule activité, un écran (Accueil), tout le reste en bottom sheets. */
 class MainActivity : ComponentActivity() {
     private var watcher: Job? = null
+    private var poller: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -88,10 +89,20 @@ class MainActivity : ComponentActivity() {
                 delay(10 * 60 * 1000L)
             }
         }
+        // Repli sans push : tant que l'app est visible, on exécute les commandes en attente
+        // (verrouiller / localiser) toutes les 5 s. Le push FCM reste la voie instantanée.
+        poller?.cancel()
+        poller = lifecycleScope.launch {
+            while (isActive) {
+                Repo.pollCommands()
+                delay(5_000L)
+            }
+        }
     }
 
     override fun onStop() {
         watcher?.cancel()
+        poller?.cancel()
         super.onStop()
     }
 }

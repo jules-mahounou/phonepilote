@@ -11,6 +11,10 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
+      # Comptes administrateurs (variable ou secret) : numéros ou emails séparés par des virgules. Vide = liste inchangée.
+      ADMIN_PHONES: ${{ vars.ADMIN_PHONES || secrets.ADMIN_PHONES }}
+      ACCOUNT_DOMAIN: ${{ vars.ACCOUNT_DOMAIN || 'phonepilote.xydhub.tech' }}
+      SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.xydhub.tech' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,3 +39,60 @@ jobs:
             q < "$f" > /dev/null || { echo "::error::Échec de $f (le jeton doit avoir l'accès base de données en écriture)"; exit 1; }
           done
           echo "Migrations appliquées."
+
+      # La variable ADMIN_PHONES est la source de vérité : retirer un numéro retire ses droits.
+      - name: Administrateurs
+        if: env.SKIP != '1' && env.ADMIN_PHONES != ''
+        run: |
+          LIST=""
+          IFS=',' read -ra ITEMS <<< "$ADMIN_PHONES"
+          for raw in "${ITEMS[@]}"; do
+            v=$(echo "$raw" | tr -d '[:space:]' | tr 'A-Z' 'a-z')
+            [ -z "$v" ] && continue
+            if [[ "$v" != *@* ]]; then
+              d=$(echo "$v" | tr -cd '0-9'); d="${d#00}"
+              if [[ "$d" != 229* ]] || [ ${#d} -le 10 ]; then d="229$d"; fi
+              v="$d@$ACCOUNT_DOMAIN"
+            fi
+            if ! [[ "$v" =~ ^[a-z0-9._+-]+@[a-z0-9.-]+$ ]]; then echo "::error::Entrée ADMIN_PHONES invalide : $raw"; exit 1; fi
+            LIST="$LIST${LIST:+,}'$v'"
+          done
+          [ -z "$LIST" ] && { echo "Aucun administrateur valide."; exit 0; }
+          SQL="insert into public.admins(user_id) select id from auth.users where lower(email) in ($LIST) on conflict do nothing;
+               delete from public.admins where user_id not in (select id from auth.users where lower(email) in ($LIST));
+               select u.email from public.admins a join auth.users u on u.id = a.user_id;"
+          curl -sS --fail-with-body -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+            -d "$(jq -n --arg q "$SQL" '{query: $q}')"
+          echo ""
+          echo "Administrateurs mis à jour (un numéro sans compte PhonePilote est ignoré : créez d'abord le compte dans l'app)."
+
+      # ---------- Edge Function « command » : envoi des push FCM (verrouiller / localiser) ----------
+      - name: Secrets de la fonction (clé FCM)
+        if: env.SKIP != '1'
+        env:
+          FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FCM_SERVICE_ACCOUNT" ]; then
+            echo "::warning::Secret FCM_SERVICE_ACCOUNT absent : pas de push, les commandes attendront l'ouverture de l'app."
+            BODY=$(jq -n --arg o "${SITE_URL%/}" '[{name:"ADMIN_ORIGIN", value:$o}]')
+          else
+            SA=$(printf '%s' "$FCM_SERVICE_ACCOUNT" | jq -c 'select(.type == "service_account" and .private_key and .client_email and .project_id)') || SA=""
+            if [ -z "$SA" ]; then echo "::error::FCM_SERVICE_ACCOUNT n'est pas une clé de compte de service Firebase valide (JSON complet attendu)."; exit 1; fi
+            echo "Clé de compte de service : $(printf '%s' "$SA" | jq -r .client_email)"
+            BODY=$(jq -n --arg v "$SA" --arg o "${SITE_URL%/}" '[{name:"FCM_SERVICE_ACCOUNT", value:$v}, {name:"ADMIN_ORIGIN", value:$o}]')
+          fi
+          curl -sS --fail-with-body -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/secrets" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+            -d "$BODY" > /dev/null
+          echo "Secrets de la fonction mis à jour."
+
+      # Version figée : « latest » interroge l'API GitHub et échoue quand sa limite de requêtes est atteinte.
+      - uses: supabase/setup-cli@v1
+        if: env.SKIP != '1'
+        with:
+          version: 2.118.0
+
+      - name: Déployer la fonction « command »
+        if: env.SKIP != '1'
+        run: supabase functions deploy command --project-ref "$PROJECT_REF" --no-verify-jwt --use-api

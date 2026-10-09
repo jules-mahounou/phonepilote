@@ -1,0 +1,14 @@
+# Espace admin : jamais indexé, jamais mis en cache, jamais affiché dans une iframe.
+# __SUPABASE_URL__ est remplacé par le workflow « Site ».
+Options -Indexes
+DirectoryIndex index.html
+<IfModule mod_headers.c>
+  Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+  Header always set Cache-Control "no-store, no-cache, must-revalidate"
+  Header always set X-Frame-Options "DENY"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src __SUPABASE_URL__; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+</IfModule>
