@@ -87,10 +87,11 @@ jobs:
             -d "$BODY" > /dev/null
           echo "Secrets de la fonction mis à jour."
 
+      # Version figée : « latest » interroge l'API GitHub et échoue quand sa limite de requêtes est atteinte.
       - uses: supabase/setup-cli@v1
         if: env.SKIP != '1'
         with:
-          version: latest
+          version: 2.118.0
 
       - name: Déployer la fonction « command »
         if: env.SKIP != '1'
