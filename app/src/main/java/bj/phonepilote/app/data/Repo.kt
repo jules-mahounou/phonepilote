@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
 import bj.phonepilote.app.BuildConfig
+import bj.phonepilote.app.admin.Locator
 import bj.phonepilote.app.admin.Protection
 import bj.phonepilote.app.push.Push
 import kotlinx.coroutines.CoroutineScope
@@ -177,21 +178,29 @@ object Repo {
         scope.launch { runPendingCommands() }
     }
 
-    /** Version bloquante, utilisée par le service push (Android ne laisse qu'environ 20 s). */
-    suspend fun runPendingCommands() {
+    /**
+     * Version bloquante, utilisée par le service push (Android ne laisse qu'environ 20 s).
+     * [locateBudgetMs] : temps maximum accordé à la recherche de position.
+     */
+    suspend fun runPendingCommands(locateBudgetMs: Long = 25_000) {
         if (!Supabase.configured || _session.value == null) return
         commandLock.withLock {
             val pending = runCatching { Supabase.pendingCommands(deviceId) }.getOrNull() ?: return
+            var fix: Locator.Fix? = null // une seule recherche de position pour toutes les commandes « locate »
             for (i in 0 until pending.length()) {
                 val c = pending.getJSONObject(i)
                 val id = c.getString("id")
                 if (!handledCommands.add(id)) continue
-                runCatching { execute(id, c.getString("kind")) }
+                runCatching {
+                    val kind = c.getString("kind")
+                    if (kind == "locate" && fix == null) fix = Locator.current(ctx, locateBudgetMs)
+                    execute(id, kind, fix)
+                }
             }
         }
     }
 
-    private suspend fun execute(id: String, kind: String) {
+    private suspend fun execute(id: String, kind: String, fix: Locator.Fix?) {
         var status = "done"
         var result: JSONObject? = null
         when (kind) {
@@ -199,16 +208,21 @@ object Repo {
             "lock" -> {
                 val ok = Protection.lockNow(ctx)
                 status = if (ok) "done" else "failed"
-                result = JSONObject().put("locked", ok)
+                result = JSONObject().put("locked", ok).apply {
+                    if (!ok) put("error", "Verrouillage à distance (administrateur de l'appareil) non activé")
+                }
             }
             "locate" -> {
-                val loc = bj.phonepilote.app.admin.Locator.current(ctx)
+                val loc = fix?.location
                 if (loc != null) {
-                    runCatching { Supabase.insertLocation(deviceId, loc.latitude, loc.longitude, loc.accuracy.takeIf { loc.hasAccuracy() }) }
+                    val accuracy = loc.accuracy.takeIf { loc.hasAccuracy() }
+                    runCatching { Supabase.insertLocation(deviceId, loc.latitude, loc.longitude, accuracy) }
                     result = JSONObject().put("lat", loc.latitude).put("lng", loc.longitude)
+                        .put("accuracy_m", accuracy?.toDouble() ?: JSONObject.NULL)
+                        .put("provider", fix?.provider).put("age_s", fix?.ageSeconds)
                 } else {
                     status = "failed"
-                    result = JSONObject().put("error", "Position indisponible (localisation désactivée ?)")
+                    result = JSONObject().put("error", fix?.error ?: "Position indisponible")
                 }
             }
             "unlock" -> result = JSONObject().put("note", "unlock non applicable en v1")

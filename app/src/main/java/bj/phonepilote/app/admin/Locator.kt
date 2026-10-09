@@ -6,6 +6,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Build
 import android.os.CancellationSignal
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -13,26 +14,51 @@ import kotlin.coroutines.resume
 
 /**
  * Position du téléphone, via le LocationManager du framework (aucune dépendance Play Services).
- * On tente une position fraîche (GPS/réseau) puis on retombe sur la dernière position connue.
+ * Ordre : fused (Android 12+) → réseau → GPS, puis repli sur la dernière position connue.
  */
 object Locator {
-    @SuppressLint("MissingPermission")
-    suspend fun current(ctx: Context): Location? {
-        if (!Protection.hasLocation(ctx)) return null
-        val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
-        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-            .filter { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
+    /** [location] non nulle = succès ; sinon [error] dit précisément ce qui bloque. */
+    class Fix(val location: Location?, val error: String?, val provider: String? = null) {
+        /** Âge de la position en secondes (une position « dernière connue » peut être ancienne). */
+        val ageSeconds: Long?
+            get() = location?.let { (SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos) / 1_000_000_000 }
+    }
 
-        // Android 11+ : getCurrentLocation donne une position fraîche sans laisser le GPS allumé.
+    @SuppressLint("MissingPermission")
+    suspend fun current(ctx: Context, budgetMs: Long = 25_000): Fix {
+        if (!Protection.hasLocation(ctx)) return Fix(null, "Permission de localisation refusée à PhonePilote")
+        val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return Fix(null, "Service de localisation absent")
+        if (Build.VERSION.SDK_INT >= 28 && !lm.isLocationEnabled) {
+            return Fix(null, "Localisation désactivée dans les réglages du téléphone")
+        }
+
+        val candidates = buildList {
+            if (Build.VERSION.SDK_INT >= 31) add(LocationManager.FUSED_PROVIDER)
+            add(LocationManager.NETWORK_PROVIDER)
+            add(LocationManager.GPS_PROVIDER)
+        }
+        val providers = candidates.filter { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
+        if (providers.isEmpty()) return Fix(null, "Aucun fournisseur de position actif (GPS et réseau coupés)")
+
+        // Android 11+ : position fraîche. Réseau / fused : 8 s max ; le GPS prend le temps restant.
         if (Build.VERSION.SDK_INT >= 30) {
+            val deadline = SystemClock.elapsedRealtime() + budgetMs
             for (p in providers) {
-                val loc = withTimeoutOrNull(7_000) { singleUpdate(lm, p, ctx) }
-                if (loc != null) return loc
+                val left = deadline - SystemClock.elapsedRealtime()
+                if (left < 1_000) break
+                val wait = if (p == LocationManager.GPS_PROVIDER) left else minOf(left, 8_000)
+                val loc = withTimeoutOrNull(wait) { singleUpdate(lm, p, ctx) }
+                if (loc != null) return Fix(loc, null, p)
             }
         }
-        // Repli : la plus récente des dernières positions connues.
-        return providers.mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
-            .maxByOrNull { it.time }
+
+        // Repli : la plus récente des dernières positions connues (y compris celles d'autres apps).
+        val last = (providers + LocationManager.PASSIVE_PROVIDER)
+            .mapNotNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull()?.let { p to it } }
+            .maxByOrNull { it.second.elapsedRealtimeNanos }
+        return if (last != null) Fix(last.second, null, "${last.first} (dernière connue)")
+        else Fix(null, "Aucune position obtenue en ${budgetMs / 1000} s (pas de signal GPS ni réseau ?)")
     }
 
     @SuppressLint("MissingPermission")

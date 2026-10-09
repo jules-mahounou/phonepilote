@@ -25,6 +25,6 @@ class PushService : FirebaseMessagingService() {
         // même exécuteur que le repli sans push, ce qui met aussi à jour la commande côté serveur.
         if (message.data["cmd"] == "lock") Protection.lockNow(this)
         // onMessageReceived tourne sur un thread de fond : on exécute ici, avant qu'Android ne coupe le service.
-        runBlocking { withTimeoutOrNull(19_000) { Repo.runPendingCommands() } }
+        runBlocking { withTimeoutOrNull(19_000) { Repo.runPendingCommands(locateBudgetMs = 13_000) } }
     }
 }
