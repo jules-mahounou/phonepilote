@@ -33,12 +33,9 @@ class SmsLocate(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, p
         } else {
             "PhonePilote: position indisponible. " + ascii(fix.error ?: "")
         }
-        val err = SmsCommands.reply(applicationContext, to, text, subId)
-        SmsCommands.recordEvent(
-            applicationContext,
-            (if (loc != null) "LOCATE : position trouvée" else "LOCATE : ${fix.error}") +
-                (err?.let { ", réponse SMS échouée ($it)" } ?: ", réponse envoyée"),
-        )
+        val label = if (loc != null) "LOCATE : position trouvée" else "LOCATE : ${fix.error}"
+        val err = SmsCommands.reply(applicationContext, to, text, subId, label)
+        SmsCommands.recordEvent(applicationContext, label + (err?.let { ", réponse SMS échouée ($it)" } ?: ", envoi de la réponse…"))
         // Si internet est disponible : la position rejoint l'historique et la trace remonte sur /admin.
         if (loc != null) Repo.reportSmsLocation(loc) else Repo.syncNow()
         return Result.success()

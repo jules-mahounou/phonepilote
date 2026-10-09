@@ -82,6 +82,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Accusé d'envoi des réponses SMS (interne à l'app). -->
+        <receiver
+            android:name=".push.SmsSentReceiver"
+            android:exported="false" />
+
         <!-- Commandes à distance (FCM). -->
         <service
             android:name=".push.PushService"

@@ -143,9 +143,10 @@ object SmsCommands {
      * Répond par la SIM qui a reçu la commande : avec deux SIM et « demander à chaque fois »,
      * la SIM par défaut n'existe pas et Android refuse l'envoi sans erreur visible.
      * Texte en ASCII : un SMS accentué est limité à 70 caractères au lieu de 160.
-     * Retourne null si l'envoi est parti, sinon la raison de l'échec.
+     * Retourne null si l'envoi a été confié au téléphone (le verdict de l'opérateur est consigné
+     * ensuite par SmsSentReceiver sous [label]), sinon la raison de l'échec immédiat.
      */
-    fun reply(ctx: Context, to: String, text: String, subId: Int): String? {
+    fun reply(ctx: Context, to: String, text: String, subId: Int, label: String): String? {
         if (!granted(ctx, Manifest.permission.SEND_SMS)) return "permission d'envoi refusée"
         return runCatching {
             val sms: SmsManager = if (Build.VERSION.SDK_INT >= 31) {
@@ -155,7 +156,18 @@ object SmsCommands {
                 @Suppress("DEPRECATION")
                 if (subId >= 0) SmsManager.getSmsManagerForSubscriptionId(subId) else SmsManager.getDefault()
             }
-            sms.sendMultipartTextMessage(to, null, sms.divideMessage(text), null, null)
+            val parts = sms.divideMessage(text)
+            // Le résultat réel (crédit, réseau) arrive plus tard dans SmsSentReceiver : un seul accusé suffit.
+            val sent = android.app.PendingIntent.getBroadcast(
+                ctx, label.hashCode(),
+                android.content.Intent(ctx, bj.phonepilote.app.push.SmsSentReceiver::class.java)
+                    .putExtra(bj.phonepilote.app.push.SmsSentReceiver.EXTRA_LABEL, label),
+                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val intents = ArrayList<android.app.PendingIntent?>(parts.size).apply {
+                repeat(parts.size) { add(if (it == parts.size - 1) sent else null) }
+            }
+            sms.sendMultipartTextMessage(to, null, parts, intents, null)
         }.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName }
     }
 }

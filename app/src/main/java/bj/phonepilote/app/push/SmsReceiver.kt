@@ -39,15 +39,13 @@ class SmsReceiver : BroadcastReceiver() {
             when (cmd.kind) {
                 SmsCommands.Kind.LOCK -> {
                     val ok = Protection.lockNow(context)
+                    val label = if (ok) "LOCK fait" else "LOCK échoué"
                     val err = SmsCommands.reply(
                         context, sender,
                         if (ok) "PhonePilote: telephone verrouille." else "PhonePilote: echec du verrouillage (protection desactivee).",
-                        subId,
+                        subId, label,
                     )
-                    SmsCommands.recordEvent(
-                        context,
-                        (if (ok) "LOCK fait" else "LOCK échoué") + (err?.let { ", réponse SMS échouée ($it)" } ?: ", réponse envoyée"),
-                    )
+                    SmsCommands.recordEvent(context, label + (err?.let { ", réponse SMS échouée ($it)" } ?: ", envoi de la réponse…"))
                 }
                 // La position peut prendre ~30 s : tâche WorkManager prioritaire plutôt que ce récepteur.
                 SmsCommands.Kind.LOCATE -> {
