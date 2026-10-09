@@ -1,2 +1,7 @@
 # Config minimale pour `supabase functions deploy` (le reste se règle dans le dashboard).
 project_id = "phonepilote"
+
+# Le contrôle d'accès est fait par la base (admin_send_command avec le jeton de l'appelant) ;
+# sans vérification au niveau de la passerelle, la requête CORS préalable (OPTIONS) passe.
+[functions.command]
+verify_jwt = false

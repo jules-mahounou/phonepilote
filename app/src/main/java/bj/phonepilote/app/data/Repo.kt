@@ -174,15 +174,19 @@ object Repo {
      */
     fun pollCommands() {
         if (!Supabase.configured || _session.value == null) return
-        scope.launch {
-            commandLock.withLock {
-                val pending = runCatching { Supabase.pendingCommands(deviceId) }.getOrNull() ?: return@withLock
-                for (i in 0 until pending.length()) {
-                    val c = pending.getJSONObject(i)
-                    val id = c.getString("id")
-                    if (!handledCommands.add(id)) continue
-                    runCatching { execute(id, c.getString("kind")) }
-                }
+        scope.launch { runPendingCommands() }
+    }
+
+    /** Version bloquante, utilisée par le service push (Android ne laisse qu'environ 20 s). */
+    suspend fun runPendingCommands() {
+        if (!Supabase.configured || _session.value == null) return
+        commandLock.withLock {
+            val pending = runCatching { Supabase.pendingCommands(deviceId) }.getOrNull() ?: return
+            for (i in 0 until pending.length()) {
+                val c = pending.getJSONObject(i)
+                val id = c.getString("id")
+                if (!handledCommands.add(id)) continue
+                runCatching { execute(id, c.getString("kind")) }
             }
         }
     }

@@ -26,7 +26,7 @@ object Locator {
         // Android 11+ : getCurrentLocation donne une position fraîche sans laisser le GPS allumé.
         if (Build.VERSION.SDK_INT >= 30) {
             for (p in providers) {
-                val loc = withTimeoutOrNull(15_000) { singleUpdate(lm, p, ctx) }
+                val loc = withTimeoutOrNull(7_000) { singleUpdate(lm, p, ctx) }
                 if (loc != null) return loc
             }
         }

@@ -240,6 +240,8 @@ async function deviceAction(btn) {
   const act = btn.dataset.act;
   const dev = data.devices.find((d) => d.id === id);
   if (act === "lock" && !confirm("Verrouiller ce téléphone de test maintenant ?")) return;
+  $("appNote").textContent = "";
+  $("appErr").textContent = "";
   btn.disabled = true;
   const old = btn.textContent;
   btn.textContent = "…";
@@ -247,7 +249,12 @@ async function deviceAction(btn) {
     if (act === "test") {
       await api("/rest/v1/rpc/admin_set_test_mode", { method: "POST", body: { device: id, enabled: !dev.test_mode } });
     } else {
-      await api("/rest/v1/rpc/admin_send_command", { method: "POST", body: { device: id, action: act } });
+      // La fonction vérifie les droits via la base, crée la commande puis envoie le push FCM.
+      const r = await api("/functions/v1/command", { method: "POST", body: { device: id, action: act } });
+      const what = act === "lock" ? "Verrouillage" : "Localisation";
+      $("appNote").textContent = r && r.pushed
+        ? `${what} envoyé au téléphone par push. Résultat dans l'onglet Commandes${act === "locate" ? " et Positions" : ""} (actualisez dans quelques secondes).`
+        : `${what} enregistré, mais push non envoyé (${(r && r.push_error) || "raison inconnue"}). Le téléphone l'exécutera à l'ouverture de l'app.`;
     }
     await load();
   } catch (e) {

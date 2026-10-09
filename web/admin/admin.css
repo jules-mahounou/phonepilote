@@ -52,6 +52,8 @@ td code{font-size:12px}
 .pill.bad{background:rgba(217,45,32,.12);color:var(--bad)}
 a{color:var(--blue)}
 .empty{text-align:center;color:var(--muted);padding:24px}
+.note-ok{color:var(--ok);font-size:14px;margin-top:10px}
+.note-ok:empty{display:none}
 .rowact{display:inline-flex;gap:6px;flex-wrap:wrap}
 .rowact .ghost{height:30px;padding:0 10px;font-size:12px}
 .rowact .ghost.on{background:var(--ok);border-color:var(--ok);color:#fff}

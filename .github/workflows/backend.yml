@@ -14,6 +14,7 @@ jobs:
       # Comptes administrateurs (variable ou secret) : numéros ou emails séparés par des virgules. Vide = liste inchangée.
       ADMIN_PHONES: ${{ vars.ADMIN_PHONES || secrets.ADMIN_PHONES }}
       ACCOUNT_DOMAIN: ${{ vars.ACCOUNT_DOMAIN || 'phonepilote.xydhub.tech' }}
+      SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.xydhub.tech' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -65,3 +66,32 @@ jobs:
             -d "$(jq -n --arg q "$SQL" '{query: $q}')"
           echo ""
           echo "Administrateurs mis à jour (un numéro sans compte PhonePilote est ignoré : créez d'abord le compte dans l'app)."
+
+      # ---------- Edge Function « command » : envoi des push FCM (verrouiller / localiser) ----------
+      - name: Secrets de la fonction (clé FCM)
+        if: env.SKIP != '1'
+        env:
+          FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FCM_SERVICE_ACCOUNT" ]; then
+            echo "::warning::Secret FCM_SERVICE_ACCOUNT absent : pas de push, les commandes attendront l'ouverture de l'app."
+            BODY=$(jq -n --arg o "${SITE_URL%/}" '[{name:"ADMIN_ORIGIN", value:$o}]')
+          else
+            SA=$(printf '%s' "$FCM_SERVICE_ACCOUNT" | jq -c 'select(.type == "service_account" and .private_key and .client_email and .project_id)') || SA=""
+            if [ -z "$SA" ]; then echo "::error::FCM_SERVICE_ACCOUNT n'est pas une clé de compte de service Firebase valide (JSON complet attendu)."; exit 1; fi
+            echo "Clé de compte de service : $(printf '%s' "$SA" | jq -r .client_email)"
+            BODY=$(jq -n --arg v "$SA" --arg o "${SITE_URL%/}" '[{name:"FCM_SERVICE_ACCOUNT", value:$v}, {name:"ADMIN_ORIGIN", value:$o}]')
+          fi
+          curl -sS --fail-with-body -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/secrets" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+            -d "$BODY" > /dev/null
+          echo "Secrets de la fonction mis à jour."
+
+      - uses: supabase/setup-cli@v1
+        if: env.SKIP != '1'
+        with:
+          version: latest
+
+      - name: Déployer la fonction « command »
+        if: env.SKIP != '1'
+        run: supabase functions deploy command --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
