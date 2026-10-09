@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>PhonePilote — Admin</title>
+<link rel="icon" href="../favicon.png">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- Connexion -->
+<main id="login" class="center" hidden>
+  <form id="loginForm" class="glass card" autocomplete="on">
+    <div class="brand"><img src="../logo.png" alt=""><div><b>PhonePilote</b><span>Espace administrateur</span></div></div>
+    <label>Numéro ou email<input id="ident" name="username" autocomplete="username" required></label>
+    <label>Mot de passe<input id="pass" name="password" type="password" autocomplete="current-password" required></label>
+    <button id="loginBtn" class="btn" type="submit">Se connecter</button>
+    <p id="loginErr" class="err" role="alert"></p>
+  </form>
+</main>
+
+<!-- Tableau de bord -->
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand"><img src="../logo.png" alt=""><div><b>PhonePilote</b><span>Admin · <span id="who"></span></span></div></div>
+    <div class="actions">
+      <button id="refresh" class="ghost" type="button">Actualiser</button>
+      <button id="logout" class="ghost" type="button">Déconnexion</button>
+    </div>
+  </header>
+
+  <p class="demo">Mode démo : consultation uniquement. Les actions (localiser, verrouiller…) seront activées après obtention des agréments.</p>
+
+  <section id="stats" class="stats"></section>
+
+  <nav id="tabs" class="tabs">
+    <button data-tab="users" class="on" type="button">Utilisateurs</button>
+    <button data-tab="devices" type="button">Téléphones</button>
+    <button data-tab="commands" type="button">Commandes</button>
+    <button data-tab="locations" type="button">Positions</button>
+    <button data-tab="versions" type="button">Versions</button>
+  </nav>
+
+  <div class="bar">
+    <input id="search" type="search" placeholder="Rechercher (numéro, nom, modèle, IMEI…)">
+    <span id="count" class="muted"></span>
+  </div>
+
+  <div class="glass wrap"><table id="table"></table></div>
+  <p id="appErr" class="err" role="alert"></p>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

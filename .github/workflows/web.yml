@@ -14,8 +14,21 @@ jobs:
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       FTP_DIR: ${{ vars.FTP_DIR }}
       SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.xydhub.tech' }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+      ACCOUNT_DOMAIN: ${{ vars.ACCOUNT_DOMAIN || 'phonepilote.xydhub.tech' }}
     steps:
       - uses: actions/checkout@v4
+
+      # Espace admin : seule la clé anon (publique) est injectée ; l'accès aux données est filtré par RLS.
+      - name: Configuration de /admin
+        run: |
+          URL="${SUPABASE_URL%/}"
+          if [ -z "$URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then echo "::warning::SUPABASE_URL / SUPABASE_ANON_KEY absents : /admin affichera « non configuré »."; fi
+          export URL
+          for f in web/admin/config.js web/admin/.htaccess; do
+            perl -pi -e 's/__SUPABASE_URL__/$ENV{URL}/g; s/__SUPABASE_ANON_KEY__/$ENV{SUPABASE_ANON_KEY}/g; s/__ACCOUNT_DOMAIN__/$ENV{ACCOUNT_DOMAIN}/g' "$f"
+          done
 
       - name: Upload FTP
         run: |
@@ -26,4 +39,5 @@ jobs:
           up web/.htaccess .htaccess
           up web/logo.png logo.png
           up web/favicon.png favicon.png
-          echo "Site : $SITE_URL"
+          for f in index.html app.js admin.css config.js .htaccess; do up "web/admin/$f" "admin/$f"; done
+          echo "Site : $SITE_URL — Admin : $SITE_URL/admin/"
