@@ -58,8 +58,10 @@ import java.util.Date
 /** Un réglage nécessaire à la protection. */
 enum class Step(val title: String, val subtitle: String) {
     ADMIN("Verrouillage à distance", "Administrateur de l'appareil"),
+    SCREEN_LOCK("Code de verrouillage", "PIN, schéma ou mot de passe"),
     LOCATION("Localisation", "Position précise"),
     BG_LOCATION("Localisation en arrière-plan", "« Toujours autoriser »"),
+    LOCATION_ON("Localisation du téléphone", "Interrupteur des réglages rapides"),
     NOTIFS("Notifications", "Alertes de PhonePilote"),
     BATTERY("Batterie sans restriction", "Pour recevoir les commandes"),
     AUTOSTART("Démarrage automatique", "Réglage du constructeur"),
@@ -68,8 +70,10 @@ enum class Step(val title: String, val subtitle: String) {
 
 fun Step.icon(): ImageVector = when (this) {
     Step.ADMIN -> Icons.Filled.Lock
+    Step.SCREEN_LOCK -> PIcons.Shield
     Step.LOCATION -> Icons.Filled.LocationOn
     Step.BG_LOCATION -> PIcons.MyLocation
+    Step.LOCATION_ON -> PIcons.MyLocation
     Step.NOTIFS -> Icons.Filled.Notifications
     Step.BATTERY -> PIcons.Battery
     Step.AUTOSTART -> PIcons.Power
@@ -79,8 +83,10 @@ fun Step.icon(): ImageVector = when (this) {
 /** Réglages applicables à ce téléphone, avec leur état (true = OK). */
 fun protectionState(ctx: Context, autostartAck: Boolean, synced: Boolean): List<Pair<Step, Boolean>> = buildList {
     add(Step.ADMIN to Protection.isAdminActive(ctx))
+    add(Step.SCREEN_LOCK to Protection.hasScreenLock(ctx))
     add(Step.LOCATION to Protection.hasLocation(ctx))
     if (Build.VERSION.SDK_INT >= 29) add(Step.BG_LOCATION to Protection.hasBackgroundLocation(ctx))
+    add(Step.LOCATION_ON to Protection.isLocationOn(ctx))
     if (Build.VERSION.SDK_INT >= 33) add(Step.NOTIFS to Protection.hasNotifications(ctx))
     add(Step.BATTERY to Protection.ignoresBattery(ctx))
     if (Protection.hasAutostartScreen) add(Step.AUTOSTART to autostartAck)

@@ -138,10 +138,12 @@ object Supabase {
     }
 
     /** Remonte une position relevée par ce téléphone. */
-    suspend fun insertLocation(deviceId: String, lat: Double, lng: Double, accuracyM: Float?) {
+    /** [source] : « command » (demandée depuis /admin) ou « periodic » (historique automatique). */
+    suspend fun insertLocation(deviceId: String, lat: Double, lng: Double, accuracyM: Float?, source: String) {
         val body = JSONObject()
             .put("device_id", deviceId).put("lat", lat).put("lng", lng)
             .put("accuracy_m", accuracyM?.toDouble() ?: JSONObject.NULL)
+            .put("source", source)
         authedOk("/rest/v1/locations", "POST", JSONArray().put(body).toString(), mapOf("Prefer" to "return=minimal"))
     }
 

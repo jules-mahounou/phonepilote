@@ -3,6 +3,7 @@
 // 1. Appelle admin_send_command AVEC LE JETON DE L'APPELANT : c'est la base qui vérifie
 //    qu'il est admin et que le téléphone est en mode test (garde-fou agréments).
 // 2. Envoie le push FCM (HTTP v1) au téléphone avec la clé de compte de service.
+//    Google le garde 28 jours (maximum) si le téléphone est éteint ou hors ligne.
 //    Si le push échoue, la commande reste en attente : l'app la récupère à sa prochaine ouverture.
 //
 // Secret requis : FCM_SERVICE_ACCOUNT (contenu JSON de la clé de compte de service Firebase).
@@ -72,7 +73,7 @@ async function sendPush(fcmToken: string, data: Record<string, string>): Promise
   const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ message: { token: fcmToken, data, android: { priority: "HIGH", ttl: "3600s" } } }),
+    body: JSON.stringify({ message: { token: fcmToken, data, android: { priority: "HIGH", ttl: "2419200s" } } }),
   });
   if (r.ok) return null;
   const j = await r.json().catch(() => ({}));

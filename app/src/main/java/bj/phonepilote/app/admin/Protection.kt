@@ -1,11 +1,13 @@
 package bj.phonepilote.app.admin
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
@@ -28,6 +30,24 @@ object Protection {
     /** Android 10+ : la localisation en arrière-plan est une permission séparée (« Toujours autoriser »). */
     fun hasBackgroundLocation(ctx: Context) =
         Build.VERSION.SDK_INT < 29 || granted(ctx, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+
+    /**
+     * Code PIN, schéma ou mot de passe actif. Sans lui, « verrouiller » ne fait qu'éteindre l'écran :
+     * n'importe qui peut le rallumer. Android interdit à l'app de poser ce code elle-même.
+     */
+    fun hasScreenLock(ctx: Context) = ctx.getSystemService(KeyguardManager::class.java).isDeviceSecure
+
+    /** Interrupteur « Localisation » du téléphone (différent de la permission accordée à l'app). */
+    fun isLocationOn(ctx: Context): Boolean {
+        val lm = ctx.getSystemService(LocationManager::class.java) ?: return false
+        return if (Build.VERSION.SDK_INT >= 28) lm.isLocationEnabled
+        else runCatching { lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)
+    }
+
+    /** Écran système de création du code de verrouillage (ne nécessite pas l'administrateur). */
+    fun screenLockIntent() = Intent(DevicePolicyManager.ACTION_SET_NEW_PASSWORD)
+
+    fun locationSettingsIntent() = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
 
     fun hasNotifications(ctx: Context) =
         Build.VERSION.SDK_INT < 33 || granted(ctx, Manifest.permission.POST_NOTIFICATIONS)

@@ -130,19 +130,41 @@ object Repo {
      */
     fun sync() {
         if (!Supabase.configured || _session.value == null) return
-        scope.launch {
-            syncLock.withLock {
-                try {
-                    if (fcmToken == null) fcmToken = Push.token()
-                    Supabase.upsertDevice(deviceJson())
-                    val now = System.currentTimeMillis()
-                    prefs.edit().putLong("last_sync", now).apply()
-                    lastSync.value = now
-                    syncError.value = null
-                } catch (e: Exception) {
-                    syncError.value = Http.friendly(e)
-                }
+        scope.launch { syncNow() }
+    }
+
+    /** Version bloquante de [sync] (tâche de fond : le travail doit être fini avant de rendre la main). */
+    suspend fun syncNow() {
+        if (!Supabase.configured || _session.value == null) return
+        syncLock.withLock {
+            try {
+                if (fcmToken == null) fcmToken = Push.token()
+                Supabase.upsertDevice(deviceJson())
+                val now = System.currentTimeMillis()
+                prefs.edit().putLong("last_sync", now).apply()
+                lastSync.value = now
+                syncError.value = null
+            } catch (e: Exception) {
+                syncError.value = Http.friendly(e)
             }
+        }
+    }
+
+    /**
+     * Tâche périodique (toutes les 30 min) : état du téléphone, commandes manquées, et position pour
+     * l'historique. Si la localisation est coupée plus tard (vol), la dernière position reste connue.
+     */
+    suspend fun heartbeat() {
+        if (!Supabase.configured || _session.value == null) return
+        syncNow()
+        runPendingCommands(locateBudgetMs = 20_000)
+        if (!Protection.isLocationOn(ctx) || !Protection.hasLocation(ctx) || !Protection.hasBackgroundLocation(ctx)) return
+        val fix = Locator.current(ctx, budgetMs = 20_000)
+        val loc = fix.location ?: return
+        // Une « dernière position connue » trop ancienne a déjà été envoyée, ou n'apporte rien.
+        if ((fix.ageSeconds ?: 0) > 30 * 60) return
+        runCatching {
+            Supabase.insertLocation(deviceId, loc.latitude, loc.longitude, loc.accuracy.takeIf { loc.hasAccuracy() }, "periodic")
         }
     }
 
@@ -158,6 +180,8 @@ object Repo {
             .put("admin_active", Protection.isAdminActive(ctx))
             .put("location_ok", Protection.hasLocation(ctx) && Protection.hasBackgroundLocation(ctx))
             .put("battery_ok", Protection.ignoresBattery(ctx))
+            .put("screen_lock_ok", Protection.hasScreenLock(ctx))
+            .put("location_enabled", Protection.isLocationOn(ctx))
             .put("owner_name", o?.name ?: JSONObject.NULL)
             .put("emergency_phone", o?.emergencyPhone ?: JSONObject.NULL)
             .put("imei", o?.imei?.ifBlank { null } ?: JSONObject.NULL)
@@ -216,7 +240,7 @@ object Repo {
                 val loc = fix?.location
                 if (loc != null) {
                     val accuracy = loc.accuracy.takeIf { loc.hasAccuracy() }
-                    runCatching { Supabase.insertLocation(deviceId, loc.latitude, loc.longitude, accuracy) }
+                    runCatching { Supabase.insertLocation(deviceId, loc.latitude, loc.longitude, accuracy, "command") }
                     result = JSONObject().put("lat", loc.latitude).put("lng", loc.longitude)
                         .put("accuracy_m", accuracy?.toDouble() ?: JSONObject.NULL)
                         .put("provider", fix?.provider).put("age_s", fix?.ageSeconds)

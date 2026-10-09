@@ -132,5 +132,8 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
     implementation("com.google.firebase:firebase-messaging")
 
+    // Tâche périodique (historique des positions, état du téléphone) : survit au redémarrage et au mode Doze.
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+
     // Réseau : HttpURLConnection + org.json du framework Android (comme xyd).
 }

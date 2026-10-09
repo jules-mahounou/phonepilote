@@ -296,7 +296,9 @@ private fun ActivateAdmin(onDone: () -> Unit) {
 
 private fun Step.explain(): String = when (this) {
     Step.ADMIN -> "Autorise PhonePilote à verrouiller l'écran à distance. Rien n'est effacé, et la désactivation reste possible depuis les réglages Android."
+    Step.SCREEN_LOCK -> "Indispensable : sans code, le verrouillage à distance éteint seulement l'écran et n'importe qui peut le rallumer. Choisissez un PIN, un schéma ou un mot de passe."
     Step.LOCATION -> "Permet d'envoyer la position du téléphone quand vous la demandez depuis la plateforme."
+    Step.LOCATION_ON -> "Gardez la localisation du téléphone allumée : si elle est coupée, il est impossible de le localiser (seule la dernière position connue reste disponible)."
     Step.BG_LOCATION -> "Sans ce réglage, la position n'est disponible que lorsque l'app est ouverte. Choisissez « Toujours autoriser »."
     Step.NOTIFS -> "PhonePilote vous prévient quand une commande est reçue ou qu'un réglage se désactive."
     Step.BATTERY -> "Sinon, Android met PhonePilote en veille et les commandes (localiser, verrouiller) arrivent en retard ou jamais."
@@ -329,6 +331,9 @@ fun StepSheet(step: Step, onDismiss: () -> Unit) {
     fun act() {
         when (step) {
             Step.ADMIN -> activity.launch(Protection.adminIntent(ctx))
+            Step.SCREEN_LOCK -> runCatching { activity.launch(Protection.screenLockIntent()) }
+                .onFailure { activity.launch(android.content.Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)) }
+            Step.LOCATION_ON -> activity.launch(Protection.locationSettingsIntent())
             Step.LOCATION -> ask(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             Step.BG_LOCATION ->
                 if (!Protection.hasLocation(ctx)) ask(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
