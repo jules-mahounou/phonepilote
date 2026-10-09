@@ -1,0 +1,18 @@
+# Type MIME correct pour l'APK + pas de cache (les mises à jour doivent être visibles immédiatement).
+AddType application/vnd.android.package-archive .apk
+<IfModule mod_headers.c>
+  <FilesMatch "^(phonepilote\.apk|version\.json)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+  <Files "phonepilote.apk">
+    Header set Content-Disposition "attachment; filename=phonepilote.apk"
+  </Files>
+</IfModule>
+Options -Indexes
+# HTTPS obligatoire : un APK de sécurité ne se télécharge jamais en clair.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>

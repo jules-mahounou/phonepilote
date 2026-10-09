@@ -1,0 +1,29 @@
+name: Site (phonepilote.vocta.site)
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ["web/**", ".github/workflows/web.yml"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FTP_HOST: ${{ secrets.FTP_HOST }}
+      FTP_USER: ${{ secrets.FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_DIR: ${{ vars.FTP_DIR }}
+      SITE_URL: ${{ vars.SITE_URL || 'https://phonepilote.vocta.site' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload FTP
+        run: |
+          if [ -z "$FTP_HOST" ]; then echo "::warning::Secrets FTP absents : site non déployé."; exit 0; fi
+          DIR="${FTP_DIR#/}"; DIR="${DIR%/}"; [ "$DIR" = "." ] && DIR=""
+          up() { curl -sS --fail --ftp-create-dirs --user "$FTP_USER:$FTP_PASSWORD" -T "$1" "ftp://$FTP_HOST/${DIR:+$DIR/}$2"; }
+          up web/index.html index.html
+          up web/.htaccess .htaccess
+          up web/logo.png logo.png
+          up web/favicon.png favicon.png
+          echo "Site : $SITE_URL"

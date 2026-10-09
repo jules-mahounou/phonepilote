@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhonePilote — Anti-vol pour votre téléphone</title>
+<meta name="description" content="PhonePilote : retrouvez votre téléphone s'il est égaré, verrouillez-le s'il est volé.">
+<meta name="theme-color" content="#005FE3">
+<link rel="icon" href="favicon.png">
+<style>
+  :root{--blue:#005FE3;--deep:#003C9E;--yellow:#FFED00;--ink:#0B1B3A;--muted:#5B6B8C;--bg:#F3F6FC;--line:#DCE3F0}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);min-height:100vh;
+    background-image:radial-gradient(circle at 5% 0%,rgba(0,95,227,.30),transparent 55%),
+      radial-gradient(circle at 105% 35%,rgba(255,237,0,.45),transparent 45%),
+      radial-gradient(circle at 15% 95%,rgba(0,95,227,.18),transparent 50%);background-attachment:fixed}
+  main{max-width:560px;margin:0 auto;padding:32px 16px 48px}
+  .glass{background:linear-gradient(180deg,rgba(255,255,255,.80),rgba(255,255,255,.55));border:1px solid rgba(255,255,255,.9);
+    border-radius:24px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+  header img{width:44px;height:44px}
+  header b{font-size:20px;display:block}
+  header span{font-size:13px;color:var(--muted)}
+  .hero{padding:28px 22px;text-align:center}
+  .hero img{width:112px;height:112px}
+  h1{font-size:28px;line-height:1.2;margin:16px 0 8px;letter-spacing:-.3px}
+  .hero p{color:var(--muted);font-size:16px;line-height:1.5}
+  .btn{display:flex;align-items:center;justify-content:center;gap:10px;height:58px;border-radius:18px;font-weight:700;font-size:16px;
+    text-decoration:none;margin-top:22px;background:var(--yellow);color:var(--ink)}
+  .btn:active{transform:scale(.98)}
+  .meta{font-size:13px;color:var(--muted);margin-top:10px}
+  h2{font-size:17px;margin:28px 4px 12px}
+  .steps{padding:8px}
+  .step{display:flex;gap:14px;align-items:flex-start;padding:12px}
+  .step+.step{border-top:1px solid rgba(220,227,240,.7)}
+  .n{flex:none;width:36px;height:36px;border-radius:12px;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:700}
+  .step b{display:block;font-size:15px}
+  .step span{font-size:14px;color:var(--muted);line-height:1.45}
+  .feat{display:grid;gap:10px}
+  .feat div{padding:14px 16px;font-size:14px;color:var(--muted)}
+  .feat b{color:var(--ink);display:block;font-size:15px;margin-bottom:2px}
+  .sha{padding:14px 16px;font-size:12px;color:var(--muted);word-break:break-all;margin-top:12px}
+  .sha code{color:var(--ink)}
+  footer{text-align:center;font-size:12px;color:var(--muted);margin-top:32px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="logo.png" alt="">
+    <div><b>PhonePilote</b><span>Anti-vol &amp; récupération</span></div>
+  </header>
+
+  <section class="glass hero">
+    <img src="logo.png" alt="Logo PhonePilote">
+    <h1>Votre téléphone, toujours sous contrôle</h1>
+    <p>Retrouvez-le s'il est égaré. Verrouillez-le à distance s'il est pris, avec votre numéro de secours affiché à l'écran.</p>
+    <a class="btn" href="phonepilote.apk" download>⬇ Télécharger l'application</a>
+    <p class="meta" id="meta">Android 8 ou plus récent</p>
+  </section>
+
+  <h2>Installation en 2 minutes</h2>
+  <div class="glass steps">
+    <div class="step"><div class="n">1</div><div><b>Téléchargez l'APK</b><span>Appuyez sur le bouton jaune ci-dessus.</span></div></div>
+    <div class="step"><div class="n">2</div><div><b>Autorisez l'installation</b><span>Android affiche « Pour votre sécurité… » : appuyez sur <b style="display:inline">Paramètres</b>, activez « Autoriser cette source », puis revenez.</span></div></div>
+    <div class="step"><div class="n">3</div><div><b>Installez puis ouvrez PhonePilote</b><span>Créez votre compte avec votre numéro et choisissez un numéro de secours.</span></div></div>
+    <div class="step"><div class="n">4</div><div><b>Activez la protection</b><span>L'application vous guide pour chaque réglage. C'est terminé.</span></div></div>
+  </div>
+
+  <h2>Ce que fait PhonePilote</h2>
+  <div class="feat">
+    <div class="glass"><b>📍 Localiser</b>Voyez où se trouve votre téléphone depuis un autre appareil.</div>
+    <div class="glass"><b>🔒 Verrouiller à distance</b>L'écran se bloque et affiche un bouton pour vous appeler.</div>
+    <div class="glass"><b>🛡️ Données intactes</b>PhonePilote n'efface jamais vos photos ni vos fichiers.</div>
+  </div>
+
+  <div class="glass sha" id="sha" hidden>Empreinte SHA-256 de l'APK officiel :<br><code id="shav"></code></div>
+
+  <footer>© PhonePilote — Bénin</footer>
+</main>
+<script>
+  fetch("version.json", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(v => {
+    if (!v) return;
+    const mo = (v.size / 1048576).toFixed(1).replace(".", ",");
+    document.getElementById("meta").textContent = `Version ${v.version_name} · ${mo} Mo · Android 8 ou plus récent`;
+    document.getElementById("shav").textContent = v.sha256;
+    document.getElementById("sha").hidden = false;
+  }).catch(() => {});
+</script>
+</body>
+</html>

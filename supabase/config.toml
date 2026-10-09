@@ -1,0 +1,2 @@
+# Config minimale pour `supabase functions deploy` (le reste se règle dans le dashboard).
+project_id = "phonepilote"

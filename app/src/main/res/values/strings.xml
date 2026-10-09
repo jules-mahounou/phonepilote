@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PhonePilote</string>
+    <string name="admin_label">Protection PhonePilote</string>
+    <string name="admin_description">Permet à PhonePilote de verrouiller ce téléphone à distance si vous le perdez ou s\'il est volé. Vos données ne sont jamais effacées.</string>
+    <string name="admin_disable_warning">Désactiver la protection ? Ce téléphone ne pourra plus être verrouillé à distance en cas de perte ou de vol.</string>
+</resources>
