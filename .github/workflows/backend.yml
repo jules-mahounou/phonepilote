@@ -11,8 +11,8 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
-      # Comptes administrateurs : numéros (ou emails) séparés par des virgules. Vide = liste inchangée.
-      ADMIN_PHONES: ${{ vars.ADMIN_PHONES }}
+      # Comptes administrateurs (variable ou secret) : numéros ou emails séparés par des virgules. Vide = liste inchangée.
+      ADMIN_PHONES: ${{ vars.ADMIN_PHONES || secrets.ADMIN_PHONES }}
       ACCOUNT_DOMAIN: ${{ vars.ACCOUNT_DOMAIN || 'phonepilote.xydhub.tech' }}
     steps:
       - uses: actions/checkout@v4
