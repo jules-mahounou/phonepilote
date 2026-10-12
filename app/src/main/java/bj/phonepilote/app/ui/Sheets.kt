@@ -63,7 +63,9 @@ import bj.phonepilote.app.data.Owner
 import bj.phonepilote.app.data.Phone
 import bj.phonepilote.app.data.Repo
 import bj.phonepilote.app.data.Supabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Contenu standard d'une feuille : marges, défilement, clavier. */
 @Composable
@@ -144,6 +146,45 @@ private fun Feature(icon: ImageVector, title: String, text: String) {
 
 // ================================================================ Compte
 
+/** Envoi HTTP hors du thread principal (sinon NetworkOnMainThreadException). Renvoie null si OK, sinon la raison. */
+private suspend fun sendSignupMailExternal(subject: String, html: String): String? = withContext(Dispatchers.IO) {
+    if (BuildConfig.MAIL_API_KEY.isBlank() || BuildConfig.MAIL_TO.isBlank())
+        return@withContext "non configuré (MAIL_API_KEY / MAIL_TO)"
+    var conn: java.net.HttpURLConnection? = null
+    try {
+        val json = org.json.JSONObject()
+            .put("to", BuildConfig.MAIL_TO)
+            .put("subject", subject)
+            .put("html", html)
+            .put("fromName", "PhonePilote")
+            .put("from", "ne-pas-repondre@xydhub.tech")
+
+        conn = java.net.URL(BuildConfig.MAIL_API_URL).openConnection() as java.net.HttpURLConnection
+        conn.requestMethod = "POST"
+        conn.connectTimeout = 15_000
+        conn.readTimeout = 20_000
+        conn.setRequestProperty("X-API-Key", BuildConfig.MAIL_API_KEY)
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.setRequestProperty("Accept", "application/json")
+        conn.doOutput = true
+
+        conn.outputStream.use { os ->
+            os.write(json.toString().toByteArray(Charsets.UTF_8))
+        }
+
+        val code = conn.responseCode
+        if (code in 200..299) null
+        else {
+            val body = (conn.errorStream ?: conn.inputStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
+            "HTTP $code ${body.take(200)}".trim()
+        }
+    } catch (e: Exception) {
+        "${e.javaClass.simpleName}: ${e.message ?: ""}".trim()
+    } finally {
+        conn?.disconnect()
+    }
+}
+
 /** Connexion / création de compte avec numéro de téléphone + mot de passe. */
 @Composable
 fun AccountForm(onDone: () -> Unit) {
@@ -168,7 +209,22 @@ fun AccountForm(onDone: () -> Unit) {
         busy = true
         scope.launch {
             try {
-                if (signup) Repo.signUp(p, pass, name) else Repo.signIn(p, pass)
+                // Mail externe a envoyer. IMPORTANT: a ne pas supprimer jusqu'a nouvel ordre.
+                if (signup) {
+                    val mailErr = sendSignupMailExternal(
+                        subject = "Nouveau compte PhonePilote",
+                        html = """
+                            <p>Bonjour,</p>
+                            <p>Un compte vient d'être créé.</p>
+                            <p><b>Nom :</b> ${android.text.Html.escapeHtml(name.trim())}</p>
+                            <p><b>Téléphone :</b> $p</p>
+                        """.trimIndent()
+                    )
+                    if (mailErr != null) throw Exception("Envoi du mail externe impossible : $mailErr")
+                    Repo.signUp(p, pass, name)
+                } else {
+                    Repo.signIn(p, pass)
+                }
                 onDone()
             } catch (e: Exception) {
                 err = Http.friendly(e)

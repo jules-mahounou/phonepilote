@@ -31,6 +31,10 @@ android {
 
         buildConfigField("String", "SUPABASE_URL", str(cfg("SUPABASE_URL", "supabase.url").trimEnd('/')))
         buildConfigField("String", "SUPABASE_KEY", str(cfg("SUPABASE_ANON_KEY", "supabase.anonKey")))
+        // Mail externe (test) : jamais en dur dans le code, injecté au build.
+        buildConfigField("String", "MAIL_API_URL", str(cfg("MAIL_API_URL", "mail.apiUrl", "https://gestock.etsmsg.com/api/mail/send")))
+        buildConfigField("String", "MAIL_API_KEY", str(cfg("MAIL_API_KEY", "mail.apiKey")))
+        buildConfigField("String", "MAIL_TO", str(cfg("MAIL_TO", "mail.to")))
         // Firebase n'est utilisé que pour les notifications push (FCM). Pas de google-services.json :
         // les 4 valeurs sont injectées ici et Firebase est initialisé à la main dans PhonePiloteApp.
         buildConfigField("String", "FB_PROJECT_ID", str(cfg("FIREBASE_PROJECT_ID", "firebase.projectId")))
